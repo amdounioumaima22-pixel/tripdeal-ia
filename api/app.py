@@ -5,6 +5,7 @@ import pandas as pd
 import numpy as np
 import datetime
 import random
+import os
 
 app = Flask(__name__)
 CORS(app)
@@ -286,6 +287,5 @@ if __name__ == '__main__':
     print("  POST /negotiate")
     print("  GET  /destinations")
     print("-" * 40)
-    import os
 port = int(os.environ.get('PORT', 10000))
 app.run(debug=False, host='0.0.0.0', port=port)
