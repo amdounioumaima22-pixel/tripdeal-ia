@@ -48,16 +48,15 @@ print(f"Négociations avec deal : {len(df_deals)}")
 
 # Features (variables d'entrée)
 features_prix = [
-    'destination_enc',   # Quelle destination
-    'nb_personnes',      # Combien de personnes
-    'nb_nuits',          # Combien de nuits
-    'saison_enc',        # Quelle saison
-    'nb_options',        # Nombre d'options choisies
-    'prix_affiche',      # Prix de départ
-    'prix_plancher',     # Prix minimum
-    'budget_client',     # Budget du client
-    'ratio_budget',      # Ratio budget/prix affiché
-    'popularite_dest',   # Popularité de la destination
+    'destination_enc',
+    'nb_personnes',
+    'nb_nuits',
+    'saison_enc',
+    'prix_affiche',
+    'prix_plancher',
+    'budget_client',
+    'ratio_budget',
+    'popularite_dest',
 ]
 
 # Target (variable à prédire)
@@ -262,7 +261,6 @@ test_client = pd.DataFrame([{
     'nb_personnes':    2,
     'nb_nuits':        7,
     'saison_enc':      le_saison.transform(['haute'])[0],
-    'nb_options':      3,
     'prix_affiche':    6500,
     'prix_plancher':   4800,
     'budget_client':   5200,
