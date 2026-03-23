@@ -38,6 +38,7 @@ PRIX_PLANCHERS = {
     'Rome, Italie':               1600,
     'Barcelone, Espagne':         1450,
     'Thailande':                  2400,
+    
 }
 
 POPULARITES = {
@@ -267,14 +268,13 @@ def predict_prix():
         return jsonify({'success': False, 'error': str(e)}), 400
 
 
-
 @app.route('/destinations', methods=['GET'])
 def get_destinations():
     return jsonify({
         'success':      True,
         'destinations': list(PRIX_PLANCHERS.keys()),
     })
-
+'Thailande':   
 @app.route('/generate-email', methods=['POST'])
 def generate_email():
     try:
