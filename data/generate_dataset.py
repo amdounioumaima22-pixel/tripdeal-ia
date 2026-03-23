@@ -151,73 +151,65 @@ def calculer_reward(prix_actuel, prix_plancher, prix_affiche, deal_conclu, tour)
 
 def simuler_negociation(prix_affiche, prix_plancher, budget_client,
                          destination_popularite, saison):
-    """
-    Simule une négociation complète entre agent et client.
-    
-    STRATÉGIE DE L'AGENT :
-    ┌─────────────────────────────────────────────────────┐
-    │ marge restante > 20% → baisse 5%                   │
-    │ marge restante > 12% → baisse 3%                   │
-    │ marge restante >  6% → baisse 2%                   │
-    │ marge restante >  2% → offre alternative           │
-    │ marge restante ≤  2% → refus final                 │
-    └─────────────────────────────────────────────────────┘
-    
-    Retourne : (historique, deal_conclu, prix_final)
-    """
 
     historique  = []
     prix_actuel = prix_affiche
     tour        = 0
-    max_tours   = 6
+    max_tours   = 8
     deal_conclu = False
     prix_final  = 0
 
+    alternatives_ordre = [
+        'changer_hotel_5_4',
+        'changer_hotel_4_3',
+        'retirer_excursion',
+        'changer_transport',
+        'retirer_assurance',
+    ]
+    ALTERNATIVES_ECO = {
+        'changer_hotel_5_4': 0.10,
+        'changer_hotel_4_3': 0.08,
+        'retirer_excursion':  0.05,
+        'changer_transport':  0.03,
+        'retirer_assurance':  0.02,
+    }
+    alt_index = 0
+
     while tour < max_tours and not deal_conclu:
         tour += 1
-
-        # ── DÉCISION DU CLIENT ──
-        # Le client accepte si prix <= son budget + tolérance (2-8%)
         tolerance = random.uniform(0.02, 0.08)
 
         if prix_actuel <= budget_client * (1 + tolerance):
-            # CLIENT ACCEPTE
-            deal_conclu      = True
-            prix_final       = prix_actuel
-            reaction_client  = 'accepte'
-            action_agent     = 'aucune'
-            reward           = calculer_reward(prix_final, prix_plancher,
-                                               prix_affiche, True, tour)
-
+            deal_conclu     = True
+            prix_final      = prix_actuel
+            reaction_client = 'accepte'
+            action_agent    = 'aucune'
+            reward          = calculer_reward(prix_final, prix_plancher, prix_affiche, True, tour)
         else:
-            # CLIENT REFUSE → "trop cher"
             reaction_client = 'trop_cher'
+            marge_restante  = prix_actuel - prix_plancher
+            marge_pct       = marge_restante / prix_actuel
 
-            # ── DÉCISION DE L'AGENT ──
-            marge_restante = prix_actuel - prix_plancher
-            marge_pct      = marge_restante / prix_actuel
-
-            if marge_pct > 0.20:
+            if tour <= 2 and marge_pct > 0.15:
                 action_agent = 'reduire_5_pct'
-                reduction    = prix_actuel * 0.05
+                nouveau_prix = prix_actuel * 0.95
 
-            elif marge_pct > 0.12:
+            elif tour == 3 and marge_pct > 0.10:
                 action_agent = 'reduire_3_pct'
-                reduction    = prix_actuel * 0.03
+                nouveau_prix = prix_actuel * 0.97
 
-            elif marge_pct > 0.06:
-                action_agent = 'reduire_2_pct'
-                reduction    = prix_actuel * 0.02
+            elif alt_index < len(alternatives_ordre) and marge_pct > 0.02:
+                action_agent = alternatives_ordre[alt_index]
+                nouveau_prix = prix_actuel * (1 - ALTERNATIVES_ECO[action_agent])
+                alt_index   += 1
 
             elif marge_pct > 0.02:
-                action_agent = 'offre_alternative'
-                reduction    = prix_actuel * 0.01
+                action_agent = 'reduire_2_pct'
+                nouveau_prix = prix_actuel * 0.98
 
             else:
-                # Au plancher → refus final
                 action_agent = 'refuser_negociation'
-                reward       = calculer_reward(prix_actuel, prix_plancher,
-                                               prix_affiche, False, tour)
+                reward       = calculer_reward(prix_actuel, prix_plancher, prix_affiche, False, tour)
                 historique.append({
                     'tour':            tour,
                     'prix_propose':    prix_actuel,
@@ -234,18 +226,10 @@ def simuler_negociation(prix_affiche, prix_plancher, budget_client,
                 })
                 break
 
-            nouveau_prix = prix_actuel - reduction
+            nouveau_prix = max(nouveau_prix, prix_plancher)
+            reward       = calculer_reward(round(nouveau_prix), prix_plancher, prix_affiche, False, tour)
+            prix_actuel  = round(nouveau_prix)
 
-            # SÉCURITÉ : jamais sous le prix plancher
-            if nouveau_prix < prix_plancher:
-                nouveau_prix = prix_plancher
-                action_agent = 'refuser_negociation'
-
-            reward      = calculer_reward(nouveau_prix, prix_plancher,
-                                          prix_affiche, False, tour)
-            prix_actuel = round(nouveau_prix)
-
-        # Enregistrer ce tour
         historique.append({
             'tour':            tour,
             'prix_propose':    prix_actuel,
@@ -262,8 +246,6 @@ def simuler_negociation(prix_affiche, prix_plancher, budget_client,
         })
 
     return historique, deal_conclu, prix_final if deal_conclu else 0
-
-
 # ══════════════════════════════════════════
 # GÉNÉRATION DU DATASET
 # ══════════════════════════════════════════
