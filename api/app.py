@@ -288,4 +288,4 @@ if __name__ == '__main__':
     print("  GET  /destinations")
     print("-" * 40)
     port = int(os.environ.get('PORT', 10000))
-    app.run(debug=False, host='0.0.0.0', port=port)
+    app.run(debug=False, host='0.0.0.0', port=5000)
