@@ -38,7 +38,7 @@ PRIX_PLANCHERS = {
     'Rome, Italie':               1600,
     'Barcelone, Espagne':         1450,
     'Thailande':                  2400,
-    
+    'Thaïlande':                  2400,
 }
 
 POPULARITES = {
@@ -50,6 +50,7 @@ POPULARITES = {
     'Rome, Italie':               0.78,
     'Barcelone, Espagne':         0.76,
     'Thailande':                  0.82,
+    'Thaïlande':                  0.82,
 }
 
 SAISONS_MOIS = {
@@ -57,6 +58,18 @@ SAISONS_MOIS = {
     3: 'moyenne', 4: 'moyenne', 5: 'moyenne',
     9: 'moyenne', 10: 'moyenne',
     6: 'haute', 7: 'haute', 8: 'haute', 12: 'haute',
+}
+
+# ══════════════════════════════════════════
+# ALTERNATIVES DE SERVICES
+# ══════════════════════════════════════════
+
+ALTERNATIVES_INFO = {
+    'changer_hotel_5_4': {'label': 'Hôtel 5★ → 4★',        'description': "Je remplace l'hôtel 5 étoiles par un 4 étoiles excellent — même confort, prix réduit."},
+    'changer_hotel_4_3': {'label': 'Hôtel 4★ → 3★',        'description': "Je propose un hôtel 3 étoiles très bien noté à la place du 4 étoiles."},
+    'retirer_excursion': {'label': 'Excursion retirée',      'description': "Je retire l'excursion du package — vous pouvez la réserver sur place si vous le souhaitez."},
+    'changer_transport': {'label': 'Van → Voiture standard', 'description': "Je remplace le van par une voiture standard — tout aussi confortable pour 2-3 personnes."},
+    'retirer_assurance': {'label': 'Assurance retirée',      'description': "Je retire l'assurance voyage du package — à souscrire séparément si souhaitée."},
 }
 
 # ══════════════════════════════════════════
@@ -68,19 +81,18 @@ def get_saison():
     return SAISONS_MOIS.get(mois, 'moyenne')
 
 
-# Messages pour les nouvelles actions de service
-ALTERNATIVES_INFO = {
-    'changer_hotel_5_4':  {'label': 'Hôtel 5★ → 4★',          'description': "Je remplace l'hôtel 5 étoiles par un 4 étoiles excellent — même confort, prix réduit."},
-    'changer_hotel_4_3':  {'label': 'Hôtel 4★ → 3★',          'description': "Je propose un hôtel 3 étoiles très bien noté à la place du 4 étoiles."},
-    'retirer_excursion':  {'label': 'Excursion retirée',        'description': "Je retire l'excursion du package — vous pouvez la réserver sur place si vous le souhaitez."},
-    'changer_transport':  {'label': 'Van → Voiture standard',   'description': "Je remplace le van par une voiture standard — tout aussi confortable pour 2-3 personnes."},
-    'retirer_assurance':  {'label': 'Assurance retirée',        'description': "Je retire l'assurance voyage du package — à souscrire séparément si souhaitée."},
-}
+def normaliser_destination(destination):
+    """Normalise les accents pour matcher le modèle ML"""
+    mapping = {
+        'Thaïlande': 'Thailande',
+        'La Mecque, Arabie Saoudite': 'La Mecque, Arabie Saoudite',
+    }
+    return mapping.get(destination, destination)
+
 
 def generer_message(action, prix_actuel, prix_precedent, destination, tour, prix_plancher):
     reduction = round(prix_precedent - prix_actuel) if prix_precedent else 0
 
-    # Actions de baisse directe
     if action == 'reduire_5_pct':
         msgs = [
             f"Je comprends votre budget. Je peux faire un effort et vous proposer {destination} pour {prix_actuel} TND — une réduction de {reduction} TND !",
@@ -96,7 +108,6 @@ def generer_message(action, prix_actuel, prix_precedent, destination, tour, prix
             f"Nous approchons de notre limite, mais je peux encore vous proposer {prix_actuel} TND. C'est exceptionnel !",
             f"Dernière concession possible sur le prix : {prix_actuel} TND.",
         ]
-    # Actions alternatives de service
     elif action in ALTERNATIVES_INFO:
         alt = ALTERNATIVES_INFO[action]
         msgs = [
@@ -115,97 +126,6 @@ def generer_message(action, prix_actuel, prix_precedent, destination, tour, prix
 
     return random.choice(msgs)
 
-
-@app.route('/negotiate', methods=['POST'])
-def negotiate():
-    try:
-        data = request.get_json()
-
-        destination    = data.get('destination', 'Paris, France')
-        prix_actuel    = float(data.get('prix_actuel', 6000))
-        prix_plancher  = float(data.get('prix_plancher', 4500))
-        budget_client  = float(data.get('budget_client', 5000))
-        marge_actuelle = float(data.get('marge_actuelle', 1500))
-        tour           = int(data.get('tour', 1))
-        saison         = get_saison()
-        popularite     = POPULARITES.get(destination, 0.8)
-
-        marge_pct  = (marge_actuelle / prix_actuel * 100) if prix_actuel > 0 else 0
-        saison_enc = le_saison.transform([saison])[0]
-
-        # Prédire l'action via le modèle ML
-        features_action = pd.DataFrame([{
-            'tour':            tour,
-            'prix_propose':    prix_actuel,
-            'prix_plancher':   prix_plancher,
-            'budget_client':   budget_client,
-            'marge_actuelle':  marge_actuelle,
-            'marge_pct':       marge_pct,
-            'popularite_dest': popularite,
-            'saison_enc':      saison_enc,
-        }])
-
-        action_enc = model_action.predict(features_action)[0]
-        action     = le_action.inverse_transform([action_enc])[0]
-
-        # ── Correction : "aucune" impossible quand client dit "trop cher" ──
-        if action == 'aucune':
-            if   marge_pct > 20: action = 'reduire_5_pct'
-            elif marge_pct > 12: action = 'reduire_3_pct'
-            elif marge_pct > 8:  action = 'reduire_2_pct'
-            elif marge_pct > 5:  action = 'changer_hotel_4_3'
-            elif marge_pct > 3:  action = 'retirer_excursion'
-            elif marge_pct > 2:  action = 'changer_transport'
-            else:                action = 'refuser_negociation'
-
-        # ── Calcul du nouveau prix selon l'action ──
-        prix_precedent = prix_actuel
-        reductions = {
-            'reduire_5_pct':      0.95,
-            'reduire_3_pct':      0.97,
-            'reduire_2_pct':      0.98,
-            'changer_hotel_5_4':  0.90,
-            'changer_hotel_4_3':  0.92,
-            'retirer_excursion':  0.95,
-            'changer_transport':  0.97,
-            'retirer_assurance':  0.98,
-            'refuser_negociation': 1.0,
-        }
-        ratio = reductions.get(action, 1.0)
-        nouveau_prix = max(round(prix_actuel * ratio), round(prix_plancher))
-
-        # Message
-        message = generer_message(action, nouveau_prix, prix_precedent, destination, tour, prix_plancher)
-
-        # Info alternative si c'est une action de service
-        alternative_info = None
-        if action in ALTERNATIVES_INFO:
-            alternative_info = {
-                'label':       ALTERNATIVES_INFO[action]['label'],
-                'description': ALTERNATIVES_INFO[action]['description'],
-                'economie':    round(prix_precedent - nouveau_prix),
-            }
-
-        tolerance     = 0.05
-        deal_possible = nouveau_prix <= budget_client * (1 + tolerance)
-
-        return jsonify({
-            'success':          True,
-            'action':           action,
-            'prix_precedent':   round(prix_precedent),
-            'nouveau_prix':     nouveau_prix,
-            'prix_plancher':    round(prix_plancher),
-            'message':          message,
-            'deal_possible':    deal_possible,
-            'reduction':        round(prix_precedent - nouveau_prix),
-            'marge_restante':   round(nouveau_prix - prix_plancher),
-            'tour':             tour,
-            'alternative_info': alternative_info,   # ← NOUVEAU
-            'is_alternative':   action in ALTERNATIVES_INFO,  # ← NOUVEAU
-        })
-
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 400
 
 # ══════════════════════════════════════════
 # ROUTES API
@@ -235,7 +155,13 @@ def predict_prix():
         popularite    = POPULARITES.get(destination, 0.8)
         saison        = get_saison()
 
-        dest_enc   = le_dest.transform([destination])[0]
+        # Normaliser pour le modèle ML
+        dest_clean = normaliser_destination(destination)
+        try:
+            dest_enc = le_dest.transform([dest_clean])[0]
+        except Exception:
+            dest_enc = le_dest.transform(['Paris, France'])[0]
+
         saison_enc = le_saison.transform([saison])[0]
 
         features = pd.DataFrame([{
@@ -268,13 +194,120 @@ def predict_prix():
         return jsonify({'success': False, 'error': str(e)}), 400
 
 
+@app.route('/negotiate', methods=['POST'])
+def negotiate():
+    try:
+        data = request.get_json()
+
+        destination           = data.get('destination', 'Paris, France')
+        prix_actuel           = float(data.get('prix_actuel', 6000))
+        prix_plancher         = float(data.get('prix_plancher', 4500))
+        budget_client         = float(data.get('budget_client', 5000))
+        marge_actuelle        = float(data.get('marge_actuelle', 1500))
+        tour                  = int(data.get('tour', 1))
+        prix_affiche_original = float(data.get('prix_affiche_original', prix_actuel))
+        saison                = get_saison()
+        popularite            = POPULARITES.get(destination, 0.8)
+
+        marge_pct  = (marge_actuelle / prix_actuel * 100) if prix_actuel > 0 else 0
+        saison_enc = le_saison.transform([saison])[0]
+
+        # Prédire l'action via le modèle ML
+        features_action = pd.DataFrame([{
+            'tour':            tour,
+            'prix_propose':    prix_actuel,
+            'prix_plancher':   prix_plancher,
+            'budget_client':   budget_client,
+            'marge_actuelle':  marge_actuelle,
+            'marge_pct':       marge_pct,
+            'popularite_dest': popularite,
+            'saison_enc':      saison_enc,
+        }])
+
+        action_enc = model_action.predict(features_action)[0]
+        action     = le_action.inverse_transform([action_enc])[0]
+
+        # Correction : "aucune" impossible quand client dit "trop cher"
+        if action == 'aucune':
+            if   marge_pct > 20: action = 'reduire_5_pct'
+            elif marge_pct > 12: action = 'reduire_3_pct'
+            elif marge_pct > 8:  action = 'reduire_2_pct'
+            elif marge_pct > 5:  action = 'changer_hotel_4_3'
+            elif marge_pct > 3:  action = 'retirer_excursion'
+            elif marge_pct > 2:  action = 'changer_transport'
+            else:                action = 'refuser_negociation'
+
+        # ── Calcul du nouveau prix ──
+        prix_precedent = prix_actuel
+        reductions = {
+            'reduire_5_pct':       0.95,
+            'reduire_3_pct':       0.97,
+            'reduire_2_pct':       0.98,
+            'changer_hotel_5_4':   0.90,
+            'changer_hotel_4_3':   0.92,
+            'retirer_excursion':   0.95,
+            'changer_transport':   0.97,
+            'retirer_assurance':   0.98,
+            'refuser_negociation': 1.0,
+        }
+
+        ratio        = reductions.get(action, 1.0)
+        nouveau_prix = round(prix_actuel * ratio)
+
+        # LIMITE 1 : jamais sous le prix plancher
+        nouveau_prix = max(nouveau_prix, round(prix_plancher))
+
+        # LIMITE 2 : réduction totale max 25% du prix original
+        prix_min_25pct = round(prix_affiche_original * 0.75)
+        nouveau_prix   = max(nouveau_prix, prix_min_25pct)
+
+        # Si le prix ne peut plus baisser → refus final
+        if nouveau_prix >= round(prix_actuel) and action != 'refuser_negociation':
+            action       = 'refuser_negociation'
+            nouveau_prix = round(prix_actuel)
+
+        # Message
+        message = generer_message(action, nouveau_prix, prix_precedent, destination, tour, prix_plancher)
+
+        # Info alternative
+        alternative_info = None
+        if action in ALTERNATIVES_INFO:
+            alternative_info = {
+                'label':       ALTERNATIVES_INFO[action]['label'],
+                'description': ALTERNATIVES_INFO[action]['description'],
+                'economie':    round(prix_precedent - nouveau_prix),
+            }
+
+        tolerance     = 0.05
+        deal_possible = nouveau_prix <= budget_client * (1 + tolerance)
+
+        return jsonify({
+            'success':          True,
+            'action':           action,
+            'prix_precedent':   round(prix_precedent),
+            'nouveau_prix':     nouveau_prix,
+            'prix_plancher':    round(prix_plancher),
+            'message':          message,
+            'deal_possible':    deal_possible,
+            'reduction':        round(prix_precedent - nouveau_prix),
+            'marge_restante':   round(nouveau_prix - prix_plancher),
+            'tour':             tour,
+            'alternative_info': alternative_info,
+            'is_alternative':   action in ALTERNATIVES_INFO,
+        })
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+
+
 @app.route('/destinations', methods=['GET'])
 def get_destinations():
     return jsonify({
         'success':      True,
         'destinations': list(PRIX_PLANCHERS.keys()),
     })
-'Thailande':   
+
+
 @app.route('/generate-email', methods=['POST'])
 def generate_email():
     try:
@@ -310,6 +343,7 @@ L'equipe TripDeal"""
 
     except Exception as e:
         return jsonify({ 'success': False, 'error': str(e) }), 400
+
 
 if __name__ == '__main__':
     print("\nTripDeal IA API")
