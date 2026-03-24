@@ -288,10 +288,24 @@ def negotiate():
         prix_min_15pct = round(prix_affiche_original * 0.85)
         nouveau_prix   = max(nouveau_prix, prix_min_15pct)
 
-        # Si prix bloque -> refus final
-        if nouveau_prix >= round(prix_actuel) and action != 'refuser_negociation':
-            action       = 'refuser_negociation'
-            nouveau_prix = round(prix_actuel)
+       # Si prix bloque -> proposer services selon le tour
+SERVICES_PAR_TOUR = {
+    4: 'proposer_hotels',
+    5: 'proposer_transport',
+    6: 'retirer_excursion',
+    7: 'retirer_assurance',
+}
+
+if nouveau_prix >= round(prix_actuel) and action != 'refuser_negociation':
+    service_action = SERVICES_PAR_TOUR.get(tour)
+    if service_action:
+        action       = service_action
+        ratio        = reductions.get(action, 1.0)
+        nouveau_prix = round(prix_actuel * ratio)
+        nouveau_prix = max(nouveau_prix, round(prix_plancher))
+    else:
+        action       = 'refuser_negociation'
+        nouveau_prix = round(prix_actuel)
 
         message = generer_message(action, nouveau_prix, prix_precedent, destination, tour, prix_plancher)
 
