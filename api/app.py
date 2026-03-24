@@ -257,8 +257,8 @@ def negotiate():
         # LIMITE 1 : jamais sous le prix plancher
         nouveau_prix = max(nouveau_prix, round(prix_plancher))
 
-        # LIMITE 2 : réduction totale max 25% du prix original
-       prix_min_15pct = round(prix_affiche_original * 0.85)
+        # LIMITE 2 : réduction totale max 15% du prix original
+        prix_min_15pct = round(prix_affiche_original * 0.85)
         nouveau_prix   = max(nouveau_prix, prix_min_15pct)
 
         # Si le prix ne peut plus baisser → refus final
