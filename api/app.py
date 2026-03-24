@@ -11,7 +11,7 @@ app = Flask(__name__)
 CORS(app)
 
 # ══════════════════════════════════════════
-# CHARGEMENT DES MODÈLES
+# CHARGEMENT DES MODELES
 # ══════════════════════════════════════════
 
 print("Chargement des modeles...")
@@ -26,19 +26,19 @@ with open('models/features_prix.pkl', 'rb') as f: features_prix = pickle.load(f)
 print("OK - Modeles charges !")
 
 # ══════════════════════════════════════════
-# CONFIGURATION
+# PRIX PLANCHERS = prix minimum agence
 # ══════════════════════════════════════════
 
 PRIX_PLANCHERS = {
-    'Paris, France':              2100,   # affiché 2699
-    'Dubai, EAU':                 3800,   # affiché 4800
-    'Istanbul, Turquie':          2200,   # affiché 2800
-    'Marrakech, Maroc':           1900,   # affiché 2499
-    'La Mecque, Arabie Saoudite': 3500,   # affiché 4500
-    'Rome, Italie':               2200,   # affiché 2800
-    'Barcelone, Espagne':         2150,   # affiché 2750
-    'Thailande':                  3100,   # affiché 4000
-    'Thaïlande':                  3100,   # même avec accent
+    'Paris, France':              2100,
+    'Dubai, EAU':                 3800,
+    'Istanbul, Turquie':          2200,
+    'Marrakech, Maroc':           1900,
+    'La Mecque, Arabie Saoudite': 3500,
+    'Rome, Italie':               2200,
+    'Barcelone, Espagne':         2150,
+    'Thailande':                  3100,
+    'Thaïlande':                  3100,
 }
 
 POPULARITES = {
@@ -65,11 +65,34 @@ SAISONS_MOIS = {
 # ══════════════════════════════════════════
 
 ALTERNATIVES_INFO = {
-    'changer_hotel_5_4': {'label': 'Hôtel 5★ → 4★',        'description': "Je remplace l'hôtel 5 étoiles par un 4 étoiles excellent — même confort, prix réduit."},
-    'changer_hotel_4_3': {'label': 'Hôtel 4★ → 3★',        'description': "Je propose un hôtel 3 étoiles très bien noté à la place du 4 étoiles."},
-    'retirer_excursion': {'label': 'Excursion retirée',      'description': "Je retire l'excursion du package — vous pouvez la réserver sur place si vous le souhaitez."},
-    'changer_transport': {'label': 'Van → Voiture standard', 'description': "Je remplace le van par une voiture standard — tout aussi confortable pour 2-3 personnes."},
-    'retirer_assurance': {'label': 'Assurance retirée',      'description': "Je retire l'assurance voyage du package — à souscrire séparément si souhaitée."},
+    'proposer_hotels': {
+        'label':       'Choix hebergement',
+        'description': "Je peux vous proposer differentes options d hebergement pour reduire le prix.",
+    },
+    'proposer_transport': {
+        'label':       'Choix transport',
+        'description': "Je peux changer le type de transport pour reduire le cout.",
+    },
+    'retirer_excursion': {
+        'label':       'Excursion retiree',
+        'description': "Je retire l excursion du package — vous pouvez la reserver sur place.",
+    },
+    'retirer_assurance': {
+        'label':       'Assurance retiree',
+        'description': "Je retire l assurance voyage du package — a souscrire separement.",
+    },
+    'changer_hotel_5_4': {
+        'label':       'Hotel 5 etoiles vers 4 etoiles',
+        'description': "Je remplace l hotel 5 etoiles par un 4 etoiles excellent.",
+    },
+    'changer_hotel_4_3': {
+        'label':       'Hotel 4 etoiles vers 3 etoiles',
+        'description': "Je propose un hotel 3 etoiles tres bien note.",
+    },
+    'changer_transport': {
+        'label':       'Van vers Voiture standard',
+        'description': "Je remplace le van par une voiture standard.",
+    },
 }
 
 # ══════════════════════════════════════════
@@ -82,11 +105,7 @@ def get_saison():
 
 
 def normaliser_destination(destination):
-    """Normalise les accents pour matcher le modèle ML"""
-    mapping = {
-        'Thaïlande': 'Thailande',
-        'La Mecque, Arabie Saoudite': 'La Mecque, Arabie Saoudite',
-    }
+    mapping = {'Thaïlande': 'Thailande'}
     return mapping.get(destination, destination)
 
 
@@ -95,31 +114,38 @@ def generer_message(action, prix_actuel, prix_precedent, destination, tour, prix
 
     if action == 'reduire_5_pct':
         msgs = [
-            f"Je comprends votre budget. Je peux faire un effort et vous proposer {destination} pour {prix_actuel} TND — une réduction de {reduction} TND !",
-            f"Bonne nouvelle ! Je viens de revoir notre offre : {prix_actuel} TND. Économisez {reduction} TND !",
+            f"Je comprends votre budget. Je peux faire un effort et vous proposer {destination} pour {prix_actuel} TND — une reduction de {reduction} TND !",
+            f"Bonne nouvelle ! Je viens de revoir notre offre : {prix_actuel} TND. Economisez {reduction} TND !",
         ]
-    elif action == 'reduire_3_pct':
+    elif action in ('reduire_3_pct', 'reduire_2_pct'):
         msgs = [
-            f"Je fais un geste commercial pour vous : {prix_actuel} TND. C'est vraiment notre meilleure offre pour cette qualité.",
-            f"Pour vous aider, je descends à {prix_actuel} TND. Difficile d'aller plus bas avec ce niveau de services !",
+            f"Je fais un geste commercial pour vous : {prix_actuel} TND. C est vraiment notre meilleure offre.",
+            f"Derniere concession possible sur le prix : {prix_actuel} TND.",
         ]
-    elif action == 'reduire_2_pct':
+    elif action == 'proposer_hotels':
         msgs = [
-            f"Nous approchons de notre limite, mais je peux encore vous proposer {prix_actuel} TND. C'est exceptionnel !",
-            f"Dernière concession possible sur le prix : {prix_actuel} TND.",
+            f"Nous avons atteint notre limite de remise. Mais je peux vous proposer differentes options d hebergement. Nouveau prix : {prix_actuel} TND (economie de {reduction} TND) !",
+        ]
+    elif action == 'proposer_transport':
+        msgs = [
+            f"Je peux changer le type de transport pour vous faire economiser davantage. Avec transport standard : {prix_actuel} TND (economie de {reduction} TND) !",
+        ]
+    elif action == 'retirer_excursion':
+        msgs = [
+            f"Je retire l excursion du package — vous pouvez la reserver sur place si vous le souhaitez. Nouveau prix : {prix_actuel} TND (economie de {reduction} TND) !",
+        ]
+    elif action == 'retirer_assurance':
+        msgs = [
+            f"Je retire l assurance voyage du package. Nouveau prix : {prix_actuel} TND (economie de {reduction} TND). Pensez a souscrire une assurance separement !",
         ]
     elif action in ALTERNATIVES_INFO:
         alt = ALTERNATIVES_INFO[action]
         msgs = [
-            f"Je comprends que le budget reste serré. Voici une alternative : {alt['description']} "
-            f"Nouveau prix : {prix_actuel} TND (économie de {reduction} TND). Qu'en pensez-vous ?",
-            f"Pour respecter votre budget, je vous propose : {alt['label']}. "
-            f"Le prix passe à {prix_actuel} TND — une économie de {reduction} TND !",
+            f"Pour respecter votre budget, je vous propose : {alt['label']}. Le prix passe a {prix_actuel} TND — economie de {reduction} TND !",
         ]
     elif action == 'refuser_negociation':
         msgs = [
-            f"Je suis vraiment désolé, {prix_actuel} TND est notre prix plancher absolu. "
-            f"En dessous, nous ne pouvons garantir la qualité du service. C'est notre offre finale.",
+            f"Je suis vraiment desole, {prix_actuel} TND est notre prix final. En dessous, nous ne pouvons garantir la qualite du service.",
         ]
     else:
         msgs = [f"Notre offre est de {prix_actuel} TND."]
@@ -133,10 +159,7 @@ def generer_message(action, prix_actuel, prix_precedent, destination, tour, prix
 
 @app.route('/health', methods=['GET'])
 def health():
-    return jsonify({
-        'status': 'ok',
-        'message': 'TripDeal IA API est operationnelle'
-    })
+    return jsonify({'status': 'ok', 'message': 'TripDeal IA API est operationnelle'})
 
 
 @app.route('/predict-prix', methods=['POST'])
@@ -155,7 +178,6 @@ def predict_prix():
         popularite    = POPULARITES.get(destination, 0.8)
         saison        = get_saison()
 
-        # Normaliser pour le modèle ML
         dest_clean = normaliser_destination(destination)
         try:
             dest_enc = le_dest.transform([dest_clean])[0]
@@ -212,7 +234,6 @@ def negotiate():
         marge_pct  = (marge_actuelle / prix_actuel * 100) if prix_actuel > 0 else 0
         saison_enc = le_saison.transform([saison])[0]
 
-        # Prédire l'action via le modèle ML
         features_action = pd.DataFrame([{
             'tour':            tour,
             'prix_propose':    prix_actuel,
@@ -227,27 +248,33 @@ def negotiate():
         action_enc = model_action.predict(features_action)[0]
         action     = le_action.inverse_transform([action_enc])[0]
 
-        # Correction : "aucune" impossible quand client dit "trop cher"
         if action == 'aucune':
-            if   marge_pct > 20: action = 'reduire_5_pct'
-            elif marge_pct > 12: action = 'reduire_3_pct'
-            elif marge_pct > 8:  action = 'reduire_2_pct'
-            elif marge_pct > 5:  action = 'changer_hotel_4_3'
-            elif marge_pct > 3:  action = 'retirer_excursion'
-            elif marge_pct > 2:  action = 'changer_transport'
-            else:                action = 'refuser_negociation'
+            if marge_pct > 15:
+                action = 'reduire_5_pct'
+            elif marge_pct > 8:
+                action = 'proposer_hotels'
+            elif marge_pct > 5:
+                action = 'proposer_transport'
+            elif marge_pct > 3:
+                action = 'retirer_excursion'
+            elif marge_pct > 1:
+                action = 'retirer_assurance'
+            else:
+                action = 'refuser_negociation'
 
-        # ── Calcul du nouveau prix ──
         prix_precedent = prix_actuel
+
         reductions = {
             'reduire_5_pct':       0.95,
             'reduire_3_pct':       0.97,
             'reduire_2_pct':       0.98,
-            'changer_hotel_5_4':   0.90,
-            'changer_hotel_4_3':   0.92,
-            'retirer_excursion':   0.95,
-            'changer_transport':   0.97,
+            'proposer_hotels':     0.92,
+            'proposer_transport':  0.97,
+            'retirer_excursion':   0.96,
             'retirer_assurance':   0.98,
+            'changer_hotel_5_4':   0.92,
+            'changer_hotel_4_3':   0.94,
+            'changer_transport':   0.97,
             'refuser_negociation': 1.0,
         }
 
@@ -257,19 +284,17 @@ def negotiate():
         # LIMITE 1 : jamais sous le prix plancher
         nouveau_prix = max(nouveau_prix, round(prix_plancher))
 
-        # LIMITE 2 : réduction totale max 15% du prix original
+        # LIMITE 2 : reduction totale max 15% du prix original
         prix_min_15pct = round(prix_affiche_original * 0.85)
         nouveau_prix   = max(nouveau_prix, prix_min_15pct)
 
-        # Si le prix ne peut plus baisser → refus final
+        # Si prix bloque -> refus final
         if nouveau_prix >= round(prix_actuel) and action != 'refuser_negociation':
             action       = 'refuser_negociation'
             nouveau_prix = round(prix_actuel)
 
-        # Message
         message = generer_message(action, nouveau_prix, prix_precedent, destination, tour, prix_plancher)
 
-        # Info alternative
         alternative_info = None
         if action in ALTERNATIVES_INFO:
             alternative_info = {
@@ -302,10 +327,7 @@ def negotiate():
 
 @app.route('/destinations', methods=['GET'])
 def get_destinations():
-    return jsonify({
-        'success':      True,
-        'destinations': list(PRIX_PLANCHERS.keys()),
-    })
+    return jsonify({'success': True, 'destinations': list(PRIX_PLANCHERS.keys())})
 
 
 @app.route('/generate-email', methods=['POST'])
@@ -321,38 +343,27 @@ def generate_email():
         nb_tours     = data.get('nb_tours', 1)
         economie     = round(prix_affiche - prix_final)
 
-        email = f"""Bonjour {client_name},
+        email = (
+            f"Bonjour {client_name},\n\n"
+            f"Nous avons le plaisir de confirmer votre reservation de voyage avec TripDeal.\n\n"
+            f"Details de votre voyage :\n"
+            f"- Destination : {destination}\n"
+            f"- Nombre de personnes : {nb_personnes}\n"
+            f"- Nombre de nuits : {nb_nuits}\n"
+            f"- Prix negocie : {prix_final} TND\n"
+            f"- Economie realisee : {economie} TND (negociation en {nb_tours} tour(s))\n\n"
+            f"Notre equipe commerciale vous contactera dans les 24 heures.\n\n"
+            f"Merci de votre confiance !\n\n"
+            f"Cordialement,\n"
+            f"L equipe TripDeal"
+        )
 
-Nous avons le plaisir de confirmer votre reservation de voyage avec TripDeal.
-
-Details de votre voyage :
-- Destination : {destination}
-- Nombre de personnes : {nb_personnes}
-- Nombre de nuits : {nb_nuits}
-- Prix negocie : {prix_final} TND
-- Economie realisee : {economie} TND (negociation en {nb_tours} tour(s))
-
-Notre equipe commerciale vous contactera dans les 24 heures pour finaliser les details.
-
-Merci de votre confiance !
-
-Cordialement,
-L'equipe TripDeal"""
-
-        return jsonify({ 'success': True, 'email': email })
+        return jsonify({'success': True, 'email': email})
 
     except Exception as e:
-        return jsonify({ 'success': False, 'error': str(e) }), 400
+        return jsonify({'success': False, 'error': str(e)}), 400
 
 
 if __name__ == '__main__':
-    print("\nTripDeal IA API")
-    print("URL : http://localhost:5000")
-    print("Routes :")
-    print("  GET  /health")
-    print("  POST /predict-prix")
-    print("  POST /negotiate")
-    print("  GET  /destinations")
-    print("-" * 40)
-    port = int(os.environ.get('PORT', 10000))
-    app.run(debug=False, host='0.0.0.0', port=5000)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(debug=False, host='0.0.0.0', port=port)
