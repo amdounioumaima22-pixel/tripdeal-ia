@@ -26,7 +26,7 @@ with open('models/features_prix.pkl', 'rb') as f: features_prix = pickle.load(f)
 print("OK - Modeles charges !")
 
 # ══════════════════════════════════════════
-# PRIX PLANCHERS = prix minimum agence
+# CONFIGURATION
 # ══════════════════════════════════════════
 
 PRIX_PLANCHERS = {
@@ -58,6 +58,29 @@ SAISONS_MOIS = {
     3: 'moyenne', 4: 'moyenne', 5: 'moyenne',
     9: 'moyenne', 10: 'moyenne',
     6: 'haute', 7: 'haute', 8: 'haute', 12: 'haute',
+}
+
+# Reductions par action
+REDUCTIONS = {
+    'reduire_5_pct':       0.95,
+    'reduire_3_pct':       0.97,
+    'reduire_2_pct':       0.98,
+    'proposer_hotels':     0.92,
+    'proposer_transport':  0.97,
+    'retirer_excursion':   0.96,
+    'retirer_assurance':   0.98,
+    'changer_hotel_5_4':   0.92,
+    'changer_hotel_4_3':   0.94,
+    'changer_transport':   0.97,
+    'refuser_negociation': 1.0,
+}
+
+# Services proposes apres la limite 15% (par numero de tour)
+SERVICES_PAR_TOUR = {
+    4: 'proposer_hotels',
+    5: 'proposer_transport',
+    6: 'retirer_excursion',
+    7: 'retirer_assurance',
 }
 
 # ══════════════════════════════════════════
@@ -124,7 +147,7 @@ def generer_message(action, prix_actuel, prix_precedent, destination, tour, prix
         ]
     elif action == 'proposer_hotels':
         msgs = [
-            f"Nous avons atteint notre limite de remise. Mais je peux vous proposer differentes options d hebergement. Nouveau prix : {prix_actuel} TND (economie de {reduction} TND) !",
+            f"Nous avons atteint notre limite de remise sur le prix. Mais je peux vous proposer differentes options d hebergement ! Nouveau prix : {prix_actuel} TND (economie de {reduction} TND) !",
         ]
     elif action == 'proposer_transport':
         msgs = [
@@ -248,37 +271,18 @@ def negotiate():
         action_enc = model_action.predict(features_action)[0]
         action     = le_action.inverse_transform([action_enc])[0]
 
+        # Correction action "aucune"
         if action == 'aucune':
             if marge_pct > 15:
                 action = 'reduire_5_pct'
-            elif marge_pct > 8:
-                action = 'proposer_hotels'
-            elif marge_pct > 5:
-                action = 'proposer_transport'
-            elif marge_pct > 3:
-                action = 'retirer_excursion'
-            elif marge_pct > 1:
-                action = 'retirer_assurance'
+            elif tour in SERVICES_PAR_TOUR:
+                action = SERVICES_PAR_TOUR[tour]
             else:
                 action = 'refuser_negociation'
 
         prix_precedent = prix_actuel
 
-        reductions = {
-            'reduire_5_pct':       0.95,
-            'reduire_3_pct':       0.97,
-            'reduire_2_pct':       0.98,
-            'proposer_hotels':     0.92,
-            'proposer_transport':  0.97,
-            'retirer_excursion':   0.96,
-            'retirer_assurance':   0.98,
-            'changer_hotel_5_4':   0.92,
-            'changer_hotel_4_3':   0.94,
-            'changer_transport':   0.97,
-            'refuser_negociation': 1.0,
-        }
-
-        ratio        = reductions.get(action, 1.0)
+        ratio        = REDUCTIONS.get(action, 1.0)
         nouveau_prix = round(prix_actuel * ratio)
 
         # LIMITE 1 : jamais sous le prix plancher
@@ -288,24 +292,17 @@ def negotiate():
         prix_min_15pct = round(prix_affiche_original * 0.85)
         nouveau_prix   = max(nouveau_prix, prix_min_15pct)
 
-       # Si prix bloque -> proposer services selon le tour
-SERVICES_PAR_TOUR = {
-    4: 'proposer_hotels',
-    5: 'proposer_transport',
-    6: 'retirer_excursion',
-    7: 'retirer_assurance',
-}
-
-if nouveau_prix >= round(prix_actuel) and action != 'refuser_negociation':
-    service_action = SERVICES_PAR_TOUR.get(tour)
-    if service_action:
-        action       = service_action
-        ratio        = reductions.get(action, 1.0)
-        nouveau_prix = round(prix_actuel * ratio)
-        nouveau_prix = max(nouveau_prix, round(prix_plancher))
-    else:
-        action       = 'refuser_negociation'
-        nouveau_prix = round(prix_actuel)
+        # Si prix bloque -> proposer service selon le tour, sinon refus
+        if nouveau_prix >= round(prix_actuel) and action != 'refuser_negociation':
+            service_action = SERVICES_PAR_TOUR.get(tour)
+            if service_action:
+                action       = service_action
+                ratio        = REDUCTIONS.get(action, 1.0)
+                nouveau_prix = round(prix_actuel * ratio)
+                nouveau_prix = max(nouveau_prix, round(prix_plancher))
+            else:
+                action       = 'refuser_negociation'
+                nouveau_prix = round(prix_actuel)
 
         message = generer_message(action, nouveau_prix, prix_precedent, destination, tour, prix_plancher)
 
