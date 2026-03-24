@@ -30,15 +30,15 @@ print("OK - Modeles charges !")
 # ══════════════════════════════════════════
 
 PRIX_PLANCHERS = {
-    'Paris, France':              1800,
-    'Dubai, EAU':                 2600,
-    'Istanbul, Turquie':          1200,
-    'Marrakech, Maroc':           850,
-    'La Mecque, Arabie Saoudite': 3500,
-    'Rome, Italie':               1600,
-    'Barcelone, Espagne':         1450,
-    'Thailande':                  2400,
-    'Thaïlande':                  2400,
+    'Paris, France':              2100,   # affiché 2699
+    'Dubai, EAU':                 3800,   # affiché 4800
+    'Istanbul, Turquie':          2200,   # affiché 2800
+    'Marrakech, Maroc':           1900,   # affiché 2499
+    'La Mecque, Arabie Saoudite': 3500,   # affiché 4500
+    'Rome, Italie':               2200,   # affiché 2800
+    'Barcelone, Espagne':         2150,   # affiché 2750
+    'Thailande':                  3100,   # affiché 4000
+    'Thaïlande':                  3100,   # même avec accent
 }
 
 POPULARITES = {
@@ -258,8 +258,8 @@ def negotiate():
         nouveau_prix = max(nouveau_prix, round(prix_plancher))
 
         # LIMITE 2 : réduction totale max 25% du prix original
-        prix_min_25pct = round(prix_affiche_original * 0.75)
-        nouveau_prix   = max(nouveau_prix, prix_min_25pct)
+       prix_min_15pct = round(prix_affiche_original * 0.85)
+        nouveau_prix   = max(nouveau_prix, prix_min_15pct)
 
         # Si le prix ne peut plus baisser → refus final
         if nouveau_prix >= round(prix_actuel) and action != 'refuser_negociation':

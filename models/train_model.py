@@ -151,7 +151,7 @@ print(f"\nDonnées d'entraînement : {len(X_train_a)} tours")
 print(f"Données de test        : {len(X_test_a)} tours")
 
 # ── Entraînement ──
-print("\n⏳ Entraînement en cours...")
+print("\n Entraînement en cours...")
 
 model_action = RandomForestClassifier(
     n_estimators = 200,
@@ -174,7 +174,7 @@ print(f"\n{classification_report(y_test_a, y_pred_a, target_names=le_action.clas
 # ══════════════════════════════════════════
 
 fig, axes = plt.subplots(2, 2, figsize=(14, 10))
-fig.suptitle('🤖 Résultats des Modèles ML', fontsize=14, fontweight='bold')
+fig.suptitle(' Résultats des Modèles ML', fontsize=14, fontweight='bold')
 
 # ── Graphique 1 : Prédictions vs Réalité ──
 ax1 = axes[0, 0]
@@ -233,7 +233,7 @@ plt.show()
 # ══════════════════════════════════════════
 
 print("\n" + "─" * 55)
-print("💾 SAUVEGARDE DES MODÈLES")
+print(" SAUVEGARDE DES MODÈLES")
 print("─" * 55)
 
 with open('models/model_prix.pkl',    'wb') as f: pickle.dump(model_prix,   f)
