@@ -60,22 +60,14 @@ SAISONS_MOIS = {
     6: 'haute', 7: 'haute', 8: 'haute', 12: 'haute',
 }
 
-# Reductions par action
-REDUCTIONS = {
-    'reduire_5_pct':       0.95,
-    'reduire_3_pct':       0.97,
-    'reduire_2_pct':       0.98,
-    'proposer_hotels':     0.92,
-    'proposer_transport':  0.97,
-    'retirer_excursion':   0.96,
-    'retirer_assurance':   0.98,
-    'changer_hotel_5_4':   0.92,
-    'changer_hotel_4_3':   0.94,
-    'changer_transport':   0.97,
-    'refuser_negociation': 1.0,
+# Reductions baisse directe
+REDUCTIONS_PRIX = {
+    'reduire_5_pct': 0.95,
+    'reduire_3_pct': 0.97,
+    'reduire_2_pct': 0.98,
 }
 
-# Services proposes apres la limite 15% (par numero de tour)
+# Services proposes apres limite 15% (par tour)
 SERVICES_PAR_TOUR = {
     4: 'proposer_hotels',
     5: 'proposer_transport',
@@ -84,37 +76,44 @@ SERVICES_PAR_TOUR = {
 }
 
 # ══════════════════════════════════════════
-# ALTERNATIVES DE SERVICES
+# CHOIX PROPOSES AU CLIENT PAR SERVICE
 # ══════════════════════════════════════════
 
-ALTERNATIVES_INFO = {
+CHOICES_DEFINITION = {
     'proposer_hotels': {
-        'label':       'Choix hebergement',
-        'description': "Je peux vous proposer differentes options d hebergement pour reduire le prix.",
+        'titre': "Choisissez votre type d hebergement :",
+        'message': "Nous avons atteint notre limite de remise sur le prix. Mais je peux adapter votre hebergement ! Quel type preferez-vous ?",
+        'choices': [
+            {'id': 'hotel_5', 'label': 'Hotel 5 etoiles (actuel)', 'icon': 'H5', 'reduction': 0.0},
+            {'id': 'hotel_4', 'label': 'Hotel 4 etoiles',          'icon': 'H4', 'reduction': 0.08},
+            {'id': 'hotel_3', 'label': 'Hotel 3 etoiles',          'icon': 'H3', 'reduction': 0.15},
+            {'id': 'airbnb',  'label': 'Airbnb / Appartement',     'icon': 'AB', 'reduction': 0.18},
+        ]
     },
     'proposer_transport': {
-        'label':       'Choix transport',
-        'description': "Je peux changer le type de transport pour reduire le cout.",
+        'titre': "Choisissez votre type de transport :",
+        'message': "Je peux egalement adapter le transport pour reduire le cout. Quelle option vous convient ?",
+        'choices': [
+            {'id': 'van_vip', 'label': 'Van VIP (actuel)',    'icon': 'VIP', 'reduction': 0.0},
+            {'id': 'voiture', 'label': 'Voiture standard',   'icon': 'VT',  'reduction': 0.03},
+            {'id': 'bus',     'label': 'Bus / Taxi local',   'icon': 'BUS', 'reduction': 0.05},
+        ]
     },
     'retirer_excursion': {
-        'label':       'Excursion retiree',
-        'description': "Je retire l excursion du package — vous pouvez la reserver sur place.",
+        'titre': "Souhaitez-vous retirer l excursion ?",
+        'message': "Je peux retirer l excursion du package pour reduire le prix. Vous pourrez la reserver sur place si vous le souhaitez.",
+        'choices': [
+            {'id': 'garder_excursion',  'label': "Garder l excursion",  'icon': 'OUI', 'reduction': 0.0},
+            {'id': 'retirer_excursion', 'label': "Retirer l excursion", 'icon': 'NON', 'reduction': 0.04},
+        ]
     },
     'retirer_assurance': {
-        'label':       'Assurance retiree',
-        'description': "Je retire l assurance voyage du package — a souscrire separement.",
-    },
-    'changer_hotel_5_4': {
-        'label':       'Hotel 5 etoiles vers 4 etoiles',
-        'description': "Je remplace l hotel 5 etoiles par un 4 etoiles excellent.",
-    },
-    'changer_hotel_4_3': {
-        'label':       'Hotel 4 etoiles vers 3 etoiles',
-        'description': "Je propose un hotel 3 etoiles tres bien note.",
-    },
-    'changer_transport': {
-        'label':       'Van vers Voiture standard',
-        'description': "Je remplace le van par une voiture standard.",
+        'titre': "Souhaitez-vous retirer l assurance voyage ?",
+        'message': "Derniere option : je peux retirer l assurance voyage. Attention, pensez a en souscrire une separement !",
+        'choices': [
+            {'id': 'garder_assurance',  'label': "Garder l assurance",  'icon': 'OUI', 'reduction': 0.0},
+            {'id': 'retirer_assurance', 'label': "Retirer l assurance", 'icon': 'NON', 'reduction': 0.02},
+        ]
     },
 }
 
@@ -132,47 +131,18 @@ def normaliser_destination(destination):
     return mapping.get(destination, destination)
 
 
-def generer_message(action, prix_actuel, prix_precedent, destination, tour, prix_plancher):
-    reduction = round(prix_precedent - prix_actuel) if prix_precedent else 0
-
+def generer_message_baisse(action, prix_actuel, prix_precedent, destination):
+    reduction = round(prix_precedent - prix_actuel)
     if action == 'reduire_5_pct':
         msgs = [
             f"Je comprends votre budget. Je peux faire un effort et vous proposer {destination} pour {prix_actuel} TND — une reduction de {reduction} TND !",
             f"Bonne nouvelle ! Je viens de revoir notre offre : {prix_actuel} TND. Economisez {reduction} TND !",
         ]
-    elif action in ('reduire_3_pct', 'reduire_2_pct'):
-        msgs = [
-            f"Je fais un geste commercial pour vous : {prix_actuel} TND. C est vraiment notre meilleure offre.",
-            f"Derniere concession possible sur le prix : {prix_actuel} TND.",
-        ]
-    elif action == 'proposer_hotels':
-        msgs = [
-            f"Nous avons atteint notre limite de remise sur le prix. Mais je peux vous proposer differentes options d hebergement ! Nouveau prix : {prix_actuel} TND (economie de {reduction} TND) !",
-        ]
-    elif action == 'proposer_transport':
-        msgs = [
-            f"Je peux changer le type de transport pour vous faire economiser davantage. Avec transport standard : {prix_actuel} TND (economie de {reduction} TND) !",
-        ]
-    elif action == 'retirer_excursion':
-        msgs = [
-            f"Je retire l excursion du package — vous pouvez la reserver sur place si vous le souhaitez. Nouveau prix : {prix_actuel} TND (economie de {reduction} TND) !",
-        ]
-    elif action == 'retirer_assurance':
-        msgs = [
-            f"Je retire l assurance voyage du package. Nouveau prix : {prix_actuel} TND (economie de {reduction} TND). Pensez a souscrire une assurance separement !",
-        ]
-    elif action in ALTERNATIVES_INFO:
-        alt = ALTERNATIVES_INFO[action]
-        msgs = [
-            f"Pour respecter votre budget, je vous propose : {alt['label']}. Le prix passe a {prix_actuel} TND — economie de {reduction} TND !",
-        ]
-    elif action == 'refuser_negociation':
-        msgs = [
-            f"Je suis vraiment desole, {prix_actuel} TND est notre prix final. En dessous, nous ne pouvons garantir la qualite du service.",
-        ]
     else:
-        msgs = [f"Notre offre est de {prix_actuel} TND."]
-
+        msgs = [
+            f"Je fais un geste commercial pour vous : {prix_actuel} TND. C est vraiment notre meilleure offre sur le prix.",
+            f"Derniere concession possible sur le prix : {prix_actuel} TND. Economie de {reduction} TND !",
+        ]
     return random.choice(msgs)
 
 
@@ -257,6 +227,7 @@ def negotiate():
         marge_pct  = (marge_actuelle / prix_actuel * 100) if prix_actuel > 0 else 0
         saison_enc = le_saison.transform([saison])[0]
 
+        # Predire l action via le modele ML
         features_action = pd.DataFrame([{
             'tour':            tour,
             'prix_propose':    prix_actuel,
@@ -271,7 +242,7 @@ def negotiate():
         action_enc = model_action.predict(features_action)[0]
         action     = le_action.inverse_transform([action_enc])[0]
 
-        # Correction action "aucune"
+        # Correction action aucune
         if action == 'aucune':
             if marge_pct > 15:
                 action = 'reduire_5_pct'
@@ -280,56 +251,91 @@ def negotiate():
             else:
                 action = 'refuser_negociation'
 
-        prix_precedent = prix_actuel
-
-        ratio        = REDUCTIONS.get(action, 1.0)
-        nouveau_prix = round(prix_actuel * ratio)
-
-        # LIMITE 1 : jamais sous le prix plancher
-        nouveau_prix = max(nouveau_prix, round(prix_plancher))
-
-        # LIMITE 2 : reduction totale max 15% du prix original
+        # Forcer service apres limite 15%
         prix_min_15pct = round(prix_affiche_original * 0.85)
-        nouveau_prix   = max(nouveau_prix, prix_min_15pct)
+        if action in REDUCTIONS_PRIX:
+            nouveau_prix_test = round(prix_actuel * REDUCTIONS_PRIX[action])
+            nouveau_prix_test = max(nouveau_prix_test, round(prix_plancher), prix_min_15pct)
+            if nouveau_prix_test >= round(prix_actuel):
+                if tour in SERVICES_PAR_TOUR:
+                    action = SERVICES_PAR_TOUR[tour]
+                else:
+                    action = 'refuser_negociation'
 
-        # Si prix bloque -> proposer service selon le tour, sinon refus
-        if nouveau_prix >= round(prix_actuel) and action != 'refuser_negociation':
-            service_action = SERVICES_PAR_TOUR.get(tour)
-            if service_action:
-                action       = service_action
-                ratio        = REDUCTIONS.get(action, 1.0)
-                nouveau_prix = round(prix_actuel * ratio)
-                nouveau_prix = max(nouveau_prix, round(prix_plancher))
-            else:
-                action       = 'refuser_negociation'
-                nouveau_prix = round(prix_actuel)
+        # ── CAS 1 : Baisse directe du prix ──
+        if action in REDUCTIONS_PRIX:
+            prix_precedent = prix_actuel
+            ratio          = REDUCTIONS_PRIX[action]
+            nouveau_prix   = round(prix_actuel * ratio)
+            nouveau_prix   = max(nouveau_prix, round(prix_plancher), prix_min_15pct)
 
-        message = generer_message(action, nouveau_prix, prix_precedent, destination, tour, prix_plancher)
+            message       = generer_message_baisse(action, nouveau_prix, prix_precedent, destination)
+            deal_possible = nouveau_prix <= budget_client * 1.05
 
-        alternative_info = None
-        if action in ALTERNATIVES_INFO:
-            alternative_info = {
-                'label':       ALTERNATIVES_INFO[action]['label'],
-                'description': ALTERNATIVES_INFO[action]['description'],
-                'economie':    round(prix_precedent - nouveau_prix),
-            }
+            return jsonify({
+                'success':        True,
+                'action':         action,
+                'has_choices':    False,
+                'prix_precedent': round(prix_precedent),
+                'nouveau_prix':   nouveau_prix,
+                'prix_plancher':  round(prix_plancher),
+                'message':        message,
+                'deal_possible':  deal_possible,
+                'reduction':      round(prix_precedent - nouveau_prix),
+                'marge_restante': round(nouveau_prix - prix_plancher),
+                'tour':           tour,
+                'alternative_info': None,
+                'is_alternative': False,
+            })
 
-        tolerance     = 0.05
-        deal_possible = nouveau_prix <= budget_client * (1 + tolerance)
+        # ── CAS 2 : Proposer des choix de service ──
+        if action in CHOICES_DEFINITION:
+            choice_def = CHOICES_DEFINITION[action]
+            choices    = []
+            for c in choice_def['choices']:
+                c_prix = round(prix_actuel * (1 - c['reduction']))
+                c_prix = max(c_prix, round(prix_plancher))
+                choices.append({
+                    'id':          c['id'],
+                    'label':       c['label'],
+                    'icon':        c['icon'],
+                    'economie':    round(prix_actuel - c_prix),
+                    'nouveau_prix': c_prix,
+                })
 
+            return jsonify({
+                'success':      True,
+                'action':       action,
+                'has_choices':  True,
+                'choice_type':  action,
+                'choix_titre':  choice_def['titre'],
+                'choices':      choices,
+                'prix_precedent': round(prix_actuel),
+                'nouveau_prix': round(prix_actuel),
+                'message':      choice_def['message'],
+                'deal_possible': False,
+                'reduction':    0,
+                'marge_restante': round(prix_actuel - prix_plancher),
+                'tour':         tour,
+                'alternative_info': None,
+                'is_alternative': False,
+            })
+
+        # ── CAS 3 : Refus final ──
         return jsonify({
-            'success':          True,
-            'action':           action,
-            'prix_precedent':   round(prix_precedent),
-            'nouveau_prix':     nouveau_prix,
-            'prix_plancher':    round(prix_plancher),
-            'message':          message,
-            'deal_possible':    deal_possible,
-            'reduction':        round(prix_precedent - nouveau_prix),
-            'marge_restante':   round(nouveau_prix - prix_plancher),
-            'tour':             tour,
-            'alternative_info': alternative_info,
-            'is_alternative':   action in ALTERNATIVES_INFO,
+            'success':        True,
+            'action':         'refuser_negociation',
+            'has_choices':    False,
+            'prix_precedent': round(prix_actuel),
+            'nouveau_prix':   round(prix_actuel),
+            'prix_plancher':  round(prix_plancher),
+            'message':        f"C est notre meilleure offre a {round(prix_actuel)} TND. Nous avons fait le maximum pour vous ! Souhaitez-vous confirmer votre reservation ?",
+            'deal_possible':  False,
+            'reduction':      0,
+            'marge_restante': round(prix_actuel - prix_plancher),
+            'tour':           tour,
+            'alternative_info': None,
+            'is_alternative': False,
         })
 
     except Exception as e:
